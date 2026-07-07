@@ -51,7 +51,7 @@ This approach is well suited to research because it anchors answers to the docum
 - Next.js for the frontend interface
 - ChromaDB for vector storage
 - Sentence Transformers for embeddings
-- Hugging Face-based LLM integration for generation
+- Ollama / Hugging Face-based LLM integration for generation
 - PyMuPDF, python-docx, and text loaders for document parsing
 - NumPy and scikit-learn for supporting processing tasks
 
@@ -90,6 +90,35 @@ This approach is well suited to research because it anchors answers to the docum
    npm install
    npm run dev
    ```
+
+## Configuration
+
+Copy `src/.env.example` to `src/.env` and fill in your `HF_TOKEN`. All other variables have sensible defaults for local development — see the comments in `.env.example` for what each one controls (CORS origins, API key auth, upload limits, rate limits, model/generation settings).
+
+## Running in production
+
+1. Set environment variables (at minimum):
+   ```bash
+   ENV=production
+   REQUIRE_API_KEY=true
+   API_KEYS=<a long random secret>
+   CORS_ORIGINS=https://your-frontend-domain.com
+   ```
+
+2. Build and run with Docker:
+   ```bash
+   docker build -t ai-research-assistant .
+   docker run -p 8000:8000 --env-file src/.env ai-research-assistant
+   ```
+
+3. Clients must send the API key on every request:
+   ```bash
+   curl -H "X-API-Key: <your key>" https://your-api-domain.com/documents
+   ```
+
+4. `GET /health` is provided for load balancer / orchestrator liveness checks.
+
+**Note:** `app.py` (the Gradio UI) is a separate local demo interface, not part of the production API path — the FastAPI app in `backend/main.py` is the deployable service the Next.js frontend talks to.
 
 ## Summary
 

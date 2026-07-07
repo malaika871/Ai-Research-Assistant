@@ -1,10 +1,15 @@
 pymupdf
 sentence-transformers
+transformers
 chromadb
-ollama
 python-dotenv
 numpy
 scikit-learn
 python-docx
 huggingface_hub
 gradio
+fastapi
+uvicorn[standard]
+sse-starlette
+slowapi
+pydantic
