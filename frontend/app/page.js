@@ -81,14 +81,13 @@ export default function Home() {
       const data = await res.json();
       setUploadStatus({
         type: "success",
-        message: `Indexed ${data.indexed_files} document(s) (${data.total_chunks} chunks).`,
       });
       fetchDocuments();
     } catch (err) {
       console.error(err);
       setUploadStatus({
         type: "error",
-        message: "Failed to upload and index documents. Please try again.",
+        message: "Failed to upload documents. Please try again.",
       });
     } finally {
       setUploading(false);
@@ -285,7 +284,7 @@ export default function Home() {
                     </div>
                     <div>
                       <h1 className="font-bold text-lg bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
-                        SkillsOrbit
+                        Nexus AI
                       </h1>
                       <p className="text-xs text-slate-500 font-mono">AI Research Partner</p>
                     </div>
@@ -294,9 +293,6 @@ export default function Home() {
 
                 {/* Drag and Drop Zone */}
                 <div className="mt-5">
-                  <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">
-                    <UploadCloud size={14} /> Index Documents
-                  </h3>
                   
                   <div
                     onDragEnter={handleDrag}
