@@ -1,3 +1,14 @@
+from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
+from sse_starlette.sse import EventSourceResponse
+
+import config
+from src.rag_engine import RAGEngine
 import json
 import logging
 import os
@@ -13,17 +24,6 @@ base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 dotenv_path = os.path.join(base_dir, "src", ".env")
 load_dotenv(dotenv_path)
 
-from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
-from sse_starlette.sse import EventSourceResponse
-
-import config
-from src.rag_engine import RAGEngine
 
 # --- Logging setup ---
 logging.basicConfig(
