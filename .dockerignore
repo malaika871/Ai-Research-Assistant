@@ -1,0 +1,10 @@
+__pycache__
+*.pyc
+.git
+.gitignore
+src/.env
+uploads/*
+chroma_db/*
+frontend/node_modules
+frontend/.next
+*.md
