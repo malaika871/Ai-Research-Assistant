@@ -1,3 +1,11 @@
+---
+title: NexusAI
+emoji: 🤖
+colorFrom: blue
+colorTo: purple
+sdk: docker
+pinned: false
+---
 # AI Research Assistant
 
 ## Purpose
