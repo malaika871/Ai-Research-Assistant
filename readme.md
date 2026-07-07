@@ -51,7 +51,7 @@ This approach is well suited to research because it anchors answers to the docum
 - Next.js for the frontend interface
 - ChromaDB for vector storage
 - Sentence Transformers for embeddings
-- Ollama / Hugging Face-based LLM integration for generation
+- Hugging Face-based LLM integration for generation
 - PyMuPDF, python-docx, and text loaders for document parsing
 - NumPy and scikit-learn for supporting processing tasks
 
