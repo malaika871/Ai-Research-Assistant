@@ -1,0 +1,10 @@
+pymupdf
+sentence-transformers
+chromadb
+ollama
+python-dotenv
+numpy
+scikit-learn
+python-docx
+huggingface_hub
+gradio
