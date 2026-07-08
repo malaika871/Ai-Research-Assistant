@@ -291,7 +291,7 @@ export default function Home() {
                     </div>
                     <div>
                       <h1 className="font-bold text-lg bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
-                        SkillsOrbit
+                        NexusAI
                       </h1>
                       <p className="text-xs text-slate-500 font-mono">AI Research Partner</p>
                     </div>
