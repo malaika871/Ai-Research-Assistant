@@ -17,13 +17,6 @@ import uuid
 from pathlib import Path
 from typing import List
 
-from dotenv import load_dotenv
-
-# Load environment variables from src/.env
-base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-dotenv_path = os.path.join(base_dir, "src", ".env")
-load_dotenv(dotenv_path)
-
 
 # --- Logging setup ---
 logging.basicConfig(
