@@ -21,6 +21,12 @@ import {
   X
 } from "lucide-react";
 
+// Backend API base URL. Set NEXT_PUBLIC_API_URL in your environment
+// (.env.local for dev, Vercel project settings for production) to your
+// deployed backend's URL, e.g. https://malaika871-nexusai.hf.space
+// Falls back to localhost for local development if not set.
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+
 export default function Home() {
   // State
   const [question, setQuestion] = useState("");
@@ -50,7 +56,7 @@ export default function Home() {
   const fetchDocuments = async () => {
     setDocsLoading(true);
     try {
-      const res = await fetch("http://127.0.0.1:8000/documents");
+      const res = await fetch(`${API_URL}/documents`);
       const data = await res.json();
       setDocuments(data || []);
     } catch (err) {
@@ -71,7 +77,7 @@ export default function Home() {
     }
 
     try {
-      const res = await fetch("http://127.0.0.1:8000/upload", {
+      const res = await fetch(`${API_URL}/upload`, {
         method: "POST",
         body: formData,
       });
@@ -81,13 +87,14 @@ export default function Home() {
       const data = await res.json();
       setUploadStatus({
         type: "success",
+        message: `Indexed ${data.indexed_files} document(s) (${data.total_chunks} chunks).`,
       });
       fetchDocuments();
     } catch (err) {
       console.error(err);
       setUploadStatus({
         type: "error",
-        message: "Failed to upload documents. Please try again.",
+        message: "Failed to upload and index documents. Please try again.",
       });
     } finally {
       setUploading(false);
@@ -97,7 +104,7 @@ export default function Home() {
 
   const handleDelete = async (docName) => {
     try {
-      const res = await fetch(`http://127.0.0.1:8000/documents/${encodeURIComponent(docName)}`, {
+      const res = await fetch(`${API_URL}/documents/${encodeURIComponent(docName)}`, {
         method: "DELETE",
       });
       if (res.ok) {
@@ -125,7 +132,7 @@ export default function Home() {
     ]);
 
     try {
-      const res = await fetch("http://127.0.0.1:8000/chat/stream", {
+      const res = await fetch(`${API_URL}/chat/stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question: activeQuery }),
@@ -284,7 +291,7 @@ export default function Home() {
                     </div>
                     <div>
                       <h1 className="font-bold text-lg bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
-                        Nexus AI
+                        SkillsOrbit
                       </h1>
                       <p className="text-xs text-slate-500 font-mono">AI Research Partner</p>
                     </div>
@@ -293,6 +300,9 @@ export default function Home() {
 
                 {/* Drag and Drop Zone */}
                 <div className="mt-5">
+                  <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">
+                    <UploadCloud size={14} /> Index Documents
+                  </h3>
                   
                   <div
                     onDragEnter={handleDrag}
