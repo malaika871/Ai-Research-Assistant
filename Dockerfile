@@ -2,31 +2,27 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Prevent Python from writing .pyc files and buffer logs
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-
-# Install system dependencies
+# System deps needed by pymupdf / sentence-transformers wheels
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application
 COPY . .
 
-# Create runtime directories
-RUN mkdir -p uploads chroma_db
-
-# Create non-root user
-RUN useradd -m appuser && chown -R appuser:appuser /app
+# HF Spaces runs containers as a non-root user with no write access to /app by
+# default, and always maps the app to port 7860 — so we create writable dirs
+# and expose 7860 instead of 8000.
+RUN mkdir -p uploads chroma_db && \
+    useradd -m -u 1000 appuser && \
+    chown -R appuser /app
 USER appuser
 
-# Hugging Face exposes this port
-EXPOSE 8000
+EXPOSE 7860
 
-# Start FastAPI
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:7860/health')" || exit 1
+
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "7860"]
