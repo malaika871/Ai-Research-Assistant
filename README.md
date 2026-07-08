@@ -116,16 +116,13 @@ Copy `src/.env.example` to `src/.env` and fill in your `HF_TOKEN`. All other var
 2. Build and run with Docker:
    ```bash
    docker build -t ai-research-assistant .
-   docker run -p 8000:8000 --env-file src/.env ai-research-assistant
    ```
 
 3. Clients must send the API key on every request:
    ```bash
    curl -H "X-API-Key: <your key>" https://your-api-domain.com/documents
    ```
-
-4. `GET /health` is provided for load balancer / orchestrator liveness checks.
-
+   
 **Note:** `app.py` (the Gradio UI) is a separate local demo interface, not part of the production API path — the FastAPI app in `backend/main.py` is the deployable service the Next.js frontend talks to.
 
 ## Summary
