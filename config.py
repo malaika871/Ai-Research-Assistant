@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 
-load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), "src", ".env"))
+load_dotenv(override=False)
 
 
 def _get_bool(name: str, default: bool) -> bool:
