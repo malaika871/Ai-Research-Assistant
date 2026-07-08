@@ -1,5 +1,9 @@
+<<<<<<< HEAD
 src/.env
 chroma_db/
 uploads/
 __pycache__/
 *.pyc
+=======
+src/.env
+>>>>>>> e47e04ca169a125990649a4277b7a7355c1db2c9
