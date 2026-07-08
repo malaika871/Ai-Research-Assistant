@@ -9,10 +9,10 @@ from sse_starlette.sse import EventSourceResponse
 
 import config
 from src.rag_engine import RAGEngine
+from dotenv import load_dotenv
 import json
 import logging
 import os
-import shutil
 import uuid
 from pathlib import Path
 from typing import List
@@ -81,8 +81,7 @@ def startup_event():
     try:
         from src.services import ServiceHub
 
-        ServiceHub.get_embedding_model()
-        ServiceHub.get_llm_client()
+        ServiceHub.get_client()  # single warm-up call: shared HF Inference client
         engine = RAGEngine()
         logger.info("Models loaded and RAGEngine ready.")
     except Exception:
