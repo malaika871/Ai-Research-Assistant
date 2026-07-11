@@ -1,5 +1,4 @@
 # config.py
-<<<<<<< HEAD
 import os
 from dotenv import load_dotenv
 
@@ -27,6 +26,10 @@ IS_PRODUCTION = ENV == "production"
 # --- Embedding / LLM models ---
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 LLM_MODEL = os.getenv("LLM_MODEL", "Qwen/Qwen2.5-7B-Instruct")
+# Optional: force a specific Inference Provider (e.g. "novita", "together",
+# "sambanova", "hf-inference") if HF's automatic "auto" provider selection
+# can't find an active provider currently hosting LLM_MODEL. Blank = "auto".
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "").strip() or None
 
 # --- Chunking ---
 CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "512"))
@@ -68,18 +71,3 @@ RATE_LIMIT_UPLOAD = os.getenv("RATE_LIMIT_UPLOAD", "5/minute")
 
 # --- Logging ---
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
-=======
-
-# Embedding Model
-EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
-
-# LLM
-LLM_MODEL = "Qwen/Qwen2.5-7B-Instruct"
-
-# Chunking
-CHUNK_SIZE = 512
-CHUNK_OVERLAP = 64
-
-# Retrieval
-TOP_K = 5
->>>>>>> 41cac17 (INitial COmmit)
