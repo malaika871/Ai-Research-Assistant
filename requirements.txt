@@ -11,4 +11,4 @@ uvicorn[standard]
 sse-starlette
 slowapi
 pydantic
-ddgs
+duckduckgo-search
