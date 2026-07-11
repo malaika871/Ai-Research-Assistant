@@ -1,4 +1,5 @@
 # config.py
+<<<<<<< HEAD
 import os
 from dotenv import load_dotenv
 
@@ -67,3 +68,18 @@ RATE_LIMIT_UPLOAD = os.getenv("RATE_LIMIT_UPLOAD", "5/minute")
 
 # --- Logging ---
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+=======
+
+# Embedding Model
+EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+
+# LLM
+LLM_MODEL = "Qwen/Qwen2.5-7B-Instruct"
+
+# Chunking
+CHUNK_SIZE = 512
+CHUNK_OVERLAP = 64
+
+# Retrieval
+TOP_K = 5
+>>>>>>> 41cac17 (INitial COmmit)

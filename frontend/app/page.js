@@ -21,12 +21,15 @@ import {
   X
 } from "lucide-react";
 
+<<<<<<< HEAD
 // Backend API base URL. Set NEXT_PUBLIC_API_URL in your environment
 // (.env.local for dev, Vercel project settings for production) to your
 // deployed backend's URL, e.g. https://malaika871-nexusai.hf.space
 // Falls back to localhost for local development if not set.
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
+=======
+>>>>>>> 41cac17 (INitial COmmit)
 export default function Home() {
   // State
   const [question, setQuestion] = useState("");
@@ -56,7 +59,11 @@ export default function Home() {
   const fetchDocuments = async () => {
     setDocsLoading(true);
     try {
+<<<<<<< HEAD
       const res = await fetch(`${API_URL}/documents`);
+=======
+      const res = await fetch("http://127.0.0.1:8000/documents");
+>>>>>>> 41cac17 (INitial COmmit)
       const data = await res.json();
       setDocuments(data || []);
     } catch (err) {
@@ -77,7 +84,11 @@ export default function Home() {
     }
 
     try {
+<<<<<<< HEAD
       const res = await fetch(`${API_URL}/upload`, {
+=======
+      const res = await fetch("http://127.0.0.1:8000/upload", {
+>>>>>>> 41cac17 (INitial COmmit)
         method: "POST",
         body: formData,
       });
@@ -104,7 +115,11 @@ export default function Home() {
 
   const handleDelete = async (docName) => {
     try {
+<<<<<<< HEAD
       const res = await fetch(`${API_URL}/documents/${encodeURIComponent(docName)}`, {
+=======
+      const res = await fetch(`http://127.0.0.1:8000/documents/${encodeURIComponent(docName)}`, {
+>>>>>>> 41cac17 (INitial COmmit)
         method: "DELETE",
       });
       if (res.ok) {
@@ -132,7 +147,11 @@ export default function Home() {
     ]);
 
     try {
+<<<<<<< HEAD
       const res = await fetch(`${API_URL}/chat/stream`, {
+=======
+      const res = await fetch("http://127.0.0.1:8000/chat/stream", {
+>>>>>>> 41cac17 (INitial COmmit)
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question: activeQuery }),
@@ -291,7 +310,11 @@ export default function Home() {
                     </div>
                     <div>
                       <h1 className="font-bold text-lg bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
+<<<<<<< HEAD
                         NexusAI
+=======
+                        SkillsOrbit
+>>>>>>> 41cac17 (INitial COmmit)
                       </h1>
                       <p className="text-xs text-slate-500 font-mono">AI Research Partner</p>
                     </div>
