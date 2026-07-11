@@ -1,9 +1,7 @@
 src/.env
-<<<<<<< HEAD
 chroma_db/
 uploads/*
 !uploads/.gitkeep
 __pycache__/
 *.pyc
-=======
->>>>>>> 41cac17 (INitial COmmit)
+data/
