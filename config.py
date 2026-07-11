@@ -33,6 +33,9 @@ CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "64"))
 
 # --- Retrieval ---
 TOP_K = int(os.getenv("TOP_K", "5"))
+# Used for whole-document requests (summaries, overviews) where narrow
+# top-K similarity search misses most of the document's content.
+SUMMARY_TOP_K = int(os.getenv("SUMMARY_TOP_K", "15"))
 
 # --- Web search fallback ---
 # Used when no documents are uploaded, or retrieval finds nothing relevant
