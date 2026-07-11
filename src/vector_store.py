@@ -9,8 +9,14 @@ class VectorStore:
             path="./chroma_db"
         )
 
+        # Explicitly use cosine distance. Without this, Chroma defaults to
+        # squared L2 distance, which is NOT bounded to a 0-1 range -- this
+        # silently broke the "score = 1 - distance" relevance threshold used
+        # to decide between document vs. web-search fallback, causing even
+        # highly relevant matches to score far below the threshold.
         self.collection = self.client.get_or_create_collection(
-            name="research_documents"
+            name="research_documents_v2",
+            metadata={"hnsw:space": "cosine"},
         )
 
     def add_documents(
@@ -80,4 +86,3 @@ class VectorStore:
                 "source": document_name
             }
         )
-
