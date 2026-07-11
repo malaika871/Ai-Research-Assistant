@@ -1,8 +1,6 @@
 import os
-
 from huggingface_hub import InferenceClient
-
-from config import EMBEDDING_MODEL, LLM_MODEL
+from config import EMBEDDING_MODEL, LLM_MODEL, LLM_PROVIDER
 
 
 class ServiceHub:
@@ -22,7 +20,10 @@ class ServiceHub:
     def get_client(cls):
         if cls._client is None:
             print("Initializing Hugging Face Inference client...")
-            cls._client = InferenceClient(token=os.getenv("HF_TOKEN"))
+            kwargs = {"token": os.getenv("HF_TOKEN")}
+            if LLM_PROVIDER:
+                kwargs["provider"] = LLM_PROVIDER
+            cls._client = InferenceClient(**kwargs)
         return cls._client
 
     # Kept for backward compatibility with existing call sites.
