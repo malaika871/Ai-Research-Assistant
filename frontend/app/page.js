@@ -86,9 +86,7 @@ export default function Home() {
 
       const data = await res.json();
       setUploadStatus({
-        type: "success",
-        message: `Indexed ${data.indexed_files} document(s) (${data.total_chunks} chunks).`,
-      });
+        type: "success",      });
       fetchDocuments();
     } catch (err) {
       console.error(err);
