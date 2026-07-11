@@ -85,11 +85,7 @@ export default function Home() {
       if (!res.ok) throw new Error("Upload failed");
 
       const data = await res.json();
-      setUploadStatus({
-        type: "success",      });
-      fetchDocuments();
-    } catch (err) {
-      console.error(err);
+     
       setUploadStatus({
         type: "error",
         message: "Failed to upload and index documents. Please try again.",
