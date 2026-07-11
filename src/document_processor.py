@@ -18,7 +18,14 @@ class DocumentProcessor:
 
         self.vector_store = VectorStore()
 
-    def index(self, files):
+    def index(self, files, display_names=None):
+        """
+        display_names: optional dict {file_path: original_filename}. Needed
+        because uploaded files are saved to disk with a UUID-prefixed name
+        (to avoid collisions/overwrites), but users should see and be able
+        to delete documents by their original filename, not the on-disk one.
+        """
+        display_names = display_names or {}
 
         indexed_files = 0
         total_chunks = 0
@@ -30,6 +37,7 @@ class DocumentProcessor:
             pages = loader.extract_pages()
 
             document_chunks = []
+            source_name = display_names.get(file_path, Path(file_path).name)
 
             for page in pages:
 
@@ -45,7 +53,7 @@ class DocumentProcessor:
 
                             id=str(uuid.uuid4()),
 
-                            source=Path(file_path).name,
+                            source=source_name,
 
                             page=page["page"],
 

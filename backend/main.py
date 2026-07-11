@@ -22,7 +22,6 @@ base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 dotenv_path = os.path.join(base_dir, "src", ".env")
 load_dotenv(dotenv_path, override=True)
 
-
 import config
 from src.rag_engine import RAGEngine
 
@@ -132,6 +131,7 @@ async def upload_files(request: Request, files: List[UploadFile] = File(...)):
 
     max_bytes = config.MAX_UPLOAD_MB * 1024 * 1024
     saved_paths = []
+    display_names = {}
 
     try:
         for file in files:
@@ -155,8 +155,9 @@ async def upload_files(request: Request, files: List[UploadFile] = File(...)):
                     buffer.write(chunk)
 
             saved_paths.append(file_path)
+            display_names[file_path] = Path(file.filename).name
 
-        result = engine.index_documents(saved_paths)
+        result = engine.index_documents(saved_paths, display_names=display_names)
         logger.info("Indexed %s file(s), %s chunk(s).", result.get("indexed_files"), result.get("total_chunks"))
         return result
 
