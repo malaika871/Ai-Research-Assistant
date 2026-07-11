@@ -1,7 +1,8 @@
+# config.py
 import os
 from dotenv import load_dotenv
 
-load_dotenv(override=False)
+load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), "src", ".env"), override=True)
 
 
 def _get_bool(name: str, default: bool) -> bool:
@@ -32,6 +33,13 @@ CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "64"))
 
 # --- Retrieval ---
 TOP_K = int(os.getenv("TOP_K", "5"))
+
+# --- Web search fallback ---
+# Used when no documents are uploaded, or retrieval finds nothing relevant
+# to the question (best match score below this threshold).
+WEB_SEARCH_ENABLED = _get_bool("WEB_SEARCH_ENABLED", True)
+WEB_SEARCH_MAX_RESULTS = int(os.getenv("WEB_SEARCH_MAX_RESULTS", "4"))
+RETRIEVAL_SCORE_THRESHOLD = float(os.getenv("RETRIEVAL_SCORE_THRESHOLD", "0.3"))
 
 # --- Generation ---
 LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.2"))

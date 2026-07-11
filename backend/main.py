@@ -7,16 +7,24 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 from sse_starlette.sse import EventSourceResponse
 
-import config
-from src.rag_engine import RAGEngine
-from dotenv import load_dotenv
 import json
 import logging
 import os
+import shutil
 import uuid
 from pathlib import Path
 from typing import List
 
+from dotenv import load_dotenv
+
+# Load environment variables from src/.env
+base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+dotenv_path = os.path.join(base_dir, "src", ".env")
+load_dotenv(dotenv_path, override=True)
+
+
+import config
+from src.rag_engine import RAGEngine
 
 # --- Logging setup ---
 logging.basicConfig(
@@ -178,22 +186,14 @@ async def chat_stream(request: Request, req: ChatRequest):
         raise HTTPException(status_code=400, detail="Question is too long (max 2000 characters).")
 
     try:
-        token_generator, retrieved_chunks = engine.ask_stream(question)
+        token_generator, sources, context_type = engine.ask_stream(question)
     except Exception:
         logger.exception("Failed to start retrieval for question=%r", question)
         raise HTTPException(status_code=500, detail="Failed to process the question.")
 
     async def event_generator():
         try:
-            sources = [
-                {
-                    "source": c.source,
-                    "page": c.page,
-                    "score": float(getattr(c, "score", 1.0)),
-                }
-                for c in retrieved_chunks
-            ]
-            yield {"data": json.dumps({"sources": sources})}
+            yield {"data": json.dumps({"sources": sources, "context_type": context_type})}
 
             for token in token_generator:
                 yield {"data": json.dumps({"token": token})}
