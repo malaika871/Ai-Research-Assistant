@@ -26,6 +26,10 @@ IS_PRODUCTION = ENV == "production"
 # --- Embedding / LLM models ---
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
 LLM_MODEL = os.getenv("LLM_MODEL", "Qwen/Qwen2.5-7B-Instruct")
+# Optional: force a specific Inference Provider (e.g. "novita", "together",
+# "sambanova", "hf-inference") if HF's automatic "auto" provider selection
+# can't find an active provider currently hosting LLM_MODEL. Blank = "auto".
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "").strip() or None
 
 # --- Chunking ---
 CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "512"))

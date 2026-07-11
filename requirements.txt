@@ -1,4 +1,5 @@
 pymupdf
+<<<<<<< HEAD
 transformers
 chromadb
 python-dotenv
@@ -12,3 +13,14 @@ sse-starlette
 slowapi
 pydantic
 duckduckgo-search
+=======
+sentence-transformers
+chromadb
+ollama
+python-dotenv
+numpy
+scikit-learn
+python-docx
+huggingface_hub
+gradio
+>>>>>>> 41cac17 (INitial COmmit)

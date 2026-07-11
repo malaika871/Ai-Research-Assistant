@@ -70,7 +70,7 @@ class VectorStore:
         data = self.collection.get(include=["metadatas"])
         if not data or not data.get("metadatas"):
             return []
-        
+
         documents = sorted(
             {
                 metadata["source"]
