@@ -354,12 +354,6 @@ export default function Home() {
                           : "bg-rose-950/30 text-rose-300 border border-rose-500/20"
                       }`}
                     >
-                      {uploadStatus.type === "success" ? (
-                        <CheckCircle2 size={16} className="shrink-0 text-emerald-400" />
-                      ) : (
-                        <AlertCircle size={16} className="shrink-0 text-rose-400" />
-                      )}
-                      <span>{uploadStatus.message}</span>
                     </motion.div>
                   )}
                 </div>
