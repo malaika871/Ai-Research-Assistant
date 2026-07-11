@@ -42,31 +42,9 @@ DOCUMENT: the question asks about, summarizes, explains, or analyzes an uploaded
 document (e.g. "summarize this", "what is the main contribution of this paper",
 "explain section 3", "what does the author conclude", "list the key findings").
 
-WEB:
-Return WEB whenever the user explicitly asks you to:
-- search the web
-- browse the internet
-- look it up online
-- use web search
-- search Google
-- find online information
-
-Even if the uploaded documents contain the answer.
-
-Examples:
-
-User: search the web for self attention
-WEB
-
-User: use internet to explain transformers
-WEB
-
-User: look this up online
-WEB
-
-User: Explain it more clearly
-WEB
-
+WEB: the question explicitly needs current, live, or time-sensitive external
+information (e.g. "latest news", "today's weather", "current bitcoin price",
+"who won today's match", "recent developments in X", "search the web").
 
 GENERAL: a standalone knowledge question that is neither clearly about an
 uploaded document nor explicitly time-sensitive (e.g. "what is machine learning").
