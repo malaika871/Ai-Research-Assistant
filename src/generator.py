@@ -44,7 +44,7 @@ document (e.g. "summarize this", "what is the main contribution of this paper",
 
 WEB: the question explicitly needs current, live, or time-sensitive external
 information (e.g. "latest news", "today's weather", "current bitcoin price",
-"who won today's match", "recent developments in X", "search the web").
+"who won today's match", "recent developments in X").
 
 GENERAL: a standalone knowledge question that is neither clearly about an
 uploaded document nor explicitly time-sensitive (e.g. "what is machine learning").
@@ -71,6 +71,18 @@ Category:"""
 
     # --- Document-grounded generation ---
 
+    INSUFFICIENT_INFO_MARKER = (
+        "I don't have enough information in the uploaded documents to answer this question."
+    )
+
+    def answer_is_insufficient(self, answer: str) -> bool:
+        """
+        Detects the document prompt's exact honesty response, so the router
+        can fall back to web search based on what the model actually said
+        rather than a proxy signal like embedding similarity.
+        """
+        return "don't have enough information in the uploaded documents" in answer.lower()
+
     def _build_document_prompt(self, question, retrieved_chunks):
         context = "\n\n".join(c.text for c in retrieved_chunks)
         return f"""Answer the question using ONLY the context below. Do not use any
@@ -78,8 +90,7 @@ outside knowledge, and do not guess or make up information, facts, or
 citations that are not present in the context.
 
 If the context does not contain enough information to answer the question,
-respond exactly with: "I don't have enough information in the uploaded
-documents to answer this question."
+respond exactly with: "{self.INSUFFICIENT_INFO_MARKER}"
 
 Context:
 {context}

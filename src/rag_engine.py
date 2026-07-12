@@ -23,108 +23,103 @@ class RAGEngine:
     def _has_documents(self) -> bool:
         return bool(self.vector_store.list_documents())
 
-    def _decide_context(self, question):
-        """
-        Routing, in priority order:
+    def _retrieve_for_intent(self, question, intent):
+        query_embedding = self.embedder.embed_query(question)
+        top_k = config.SUMMARY_TOP_K if intent == "DOCUMENT" else config.TOP_K
+        return self.retriever.retrieve(query_embedding, top_k=top_k)
 
-        1. No documents uploaded at all -> web, no classifier call needed
-           (trivial, deterministic, saves an LLM round trip).
-        2. Documents exist -> classify intent:
-             DOCUMENT -> always answer from documents. Broad retrieval
-                         (SUMMARY_TOP_K) since these are often whole-document
-                         requests. Never silently falls back to web, even if
-                         the documents don't cover it -- the generator's
-                         prompt handles that by saying so honestly.
-             WEB       -> always web search, regardless of what's in the
-                         vector store (the question explicitly wants
-                         current/external info).
-             GENERAL   -> ambiguous standalone question. Try documents
-                         (normal TOP_K) first; only fall back to web if
-                         the best match is below the relevance threshold.
+    def _web_fallback(self, question):
+        if not config.WEB_SEARCH_ENABLED:
+            return None
+        return self.web_searcher.search(question, max_results=config.WEB_SEARCH_MAX_RESULTS) or None
 
-        Returns (context_mode, retrieved_chunks, web_results).
-        """
+    def ask(self, question):
         has_docs = self._has_documents()
 
         if not has_docs:
-            if not config.WEB_SEARCH_ENABLED:
-                return "document", [], []  # nothing to answer from, honest "no info" response
-            web_results = self.web_searcher.search(question, max_results=config.WEB_SEARCH_MAX_RESULTS)
-            return ("web", [], web_results) if web_results else ("document", [], [])
+            web_results = self._web_fallback(question)
+            if web_results:
+                return self.generator.generate_from_web(question, web_results)
+            return self.generator.generate(question, [])  # honest "no info" response
 
         intent = self.generator.classify_intent(question)
 
-        if intent == "DOCUMENT":
-            query_embedding = self.embedder.embed_query(question)
-            results = self.retriever.retrieve(query_embedding, top_k=config.SUMMARY_TOP_K)
-            return "document", results, []
-
         if intent == "WEB":
-            if not config.WEB_SEARCH_ENABLED:
-                # Fall back to whatever's in the documents rather than
-                # returning nothing, even though this isn't ideal.
-                query_embedding = self.embedder.embed_query(question)
-                results = self.retriever.retrieve(query_embedding, top_k=config.TOP_K)
-                return "document", results, []
-            web_results = self.web_searcher.search(question, max_results=config.WEB_SEARCH_MAX_RESULTS)
-            return ("web", [], web_results) if web_results else ("document", [], [])
+            web_results = self._web_fallback(question)
+            if web_results:
+                return self.generator.generate_from_web(question, web_results)
+            # No web results even though web was explicitly requested -- fall
+            # through to trying the documents rather than returning nothing.
 
-        # intent == "GENERAL": similarity-threshold-based, as before, but
-        # now scoped ONLY to genuinely ambiguous questions instead of
-        # every single question.
-        query_embedding = self.embedder.embed_query(question)
-        results = self.retriever.retrieve(query_embedding, top_k=config.TOP_K)
+        results = self._retrieve_for_intent(question, intent)
+        doc_answer = self.generator.generate(question, results)
 
-        if not config.WEB_SEARCH_ENABLED:
-            return "document", results, []
+        if self.generator.answer_is_insufficient(doc_answer["answer"]):
+            web_results = self._web_fallback(question)
+            if web_results:
+                return self.generator.generate_from_web(question, web_results)
 
-        if results and max(c.score for c in results) >= config.RETRIEVAL_SCORE_THRESHOLD:
-            return "document", results, []
-
-        web_results = self.web_searcher.search(question, max_results=config.WEB_SEARCH_MAX_RESULTS)
-        if web_results and results:
-            return "combined", results, web_results
-        if web_results:
-            return "web", [], web_results
-        return "document", results, []
-
-    def ask(self, question):
-        context_mode, results, web_results = self._decide_context(question)
-
-        if context_mode == "web":
-            return self.generator.generate_from_web(question, web_results)
-        if context_mode == "combined":
-            return self.generator.generate_combined(question, results, web_results)
-        return self.generator.generate(question, results)
+        return doc_answer
 
     def ask_stream(self, question):
-        context_mode, results, web_results = self._decide_context(question)
+        has_docs = self._has_documents()
 
-        if context_mode == "web":
-            sources = [
-                {"source": r["title"], "page": None, "url": r["url"]}
-                for r in web_results
-            ]
-            token_gen = self.generator.generate_stream_from_web(question, web_results)
-            return token_gen, sources, "web"
+        if not has_docs:
+            web_results = self._web_fallback(question)
+            if web_results:
+                return self._stream_web(question, web_results)
+            return self._stream_document(question, [])
 
-        if context_mode == "combined":
-            sources = [
-                {"source": r.source, "page": r.page, "url": None}
-                for r in results
-            ] + [
-                {"source": r["title"], "page": None, "url": r["url"]}
-                for r in web_results
-            ]
-            token_gen = self.generator.generate_stream_combined(question, results, web_results)
-            return token_gen, sources, "combined"
+        intent = self.generator.classify_intent(question)
 
+        if intent == "WEB":
+            web_results = self._web_fallback(question)
+            if web_results:
+                return self._stream_web(question, web_results)
+
+        results = self._retrieve_for_intent(question, intent)
+
+        # Generate the full document answer first (not yet streamed to the
+        # client) so we can check whether it's genuinely insufficient before
+        # deciding whether to show it or switch to web search. The already-
+        # generated text is then replayed as a stream, rather than
+        # regenerating it, so this costs one extra LLM call only on the
+        # (less common) insufficient-info path, not on every request.
+        doc_answer = self.generator.generate(question, results)
+
+        if self.generator.answer_is_insufficient(doc_answer["answer"]):
+            web_results = self._web_fallback(question)
+            if web_results:
+                return self._stream_web(question, web_results)
+
+        sources = doc_answer["sources"]
+        token_gen = self._replay_as_stream(doc_answer["answer"])
+        return token_gen, sources, "document"
+
+    def _stream_web(self, question, web_results):
+        sources = [
+            {"source": r["title"], "page": None, "url": r["url"]}
+            for r in web_results
+        ]
+        token_gen = self.generator.generate_stream_from_web(question, web_results)
+        return token_gen, sources, "web"
+
+    def _stream_document(self, question, results):
         sources = [
             {"source": r.source, "page": r.page, "url": None}
             for r in results
         ]
         token_gen = self.generator.generate_stream(question, results)
         return token_gen, sources, "document"
+
+    @staticmethod
+    def _replay_as_stream(text):
+        """Yields an already-generated answer word by word, so the client's
+        existing token-streaming UI still gets a typing effect, without a
+        second LLM call for text that's already been generated and checked."""
+        words = text.split(" ")
+        for i, word in enumerate(words):
+            yield word if i == 0 else " " + word
 
     def list_documents(self):
         return self.vector_store.list_documents()
