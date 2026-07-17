@@ -29,8 +29,11 @@ class WebSearcher:
 
         try:
             response = self._client.search(query, max_results=max_results)
-        except Exception:
-            logger.exception("Tavily web search failed for query=%r", query)
+        except Exception as exc:
+            logger.error(
+                "Tavily web search failed for query=%r: %s: %s",
+                query, type(exc).__name__, exc,
+            )
             return []
 
         results = response.get("results", []) if isinstance(response, dict) else []

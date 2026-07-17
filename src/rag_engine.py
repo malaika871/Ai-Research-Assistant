@@ -4,6 +4,7 @@ from src.retriever import Retriever
 from src.generator import Generator
 from src.vector_store import VectorStore
 from src.web_search import WebSearcher
+from src.models import RetrievalResult
 import config
 
 
@@ -24,18 +25,44 @@ class RAGEngine:
         return bool(self.vector_store.list_documents())
 
     def _retrieve_for_intent(self, question, intent):
+        if intent == "DOCUMENT":
+            docs = self.vector_store.list_documents()
+            if len(docs) == 1:
+                # Unambiguous: "the uploaded document" can only mean this
+                # one. Fetch every chunk directly instead of a similarity-
+                # ranked top-k, so a long document can't get silently
+                # truncated into an incomplete summary.
+                raw_chunks = self.vector_store.get_all_chunks(docs[0])
+                return [
+                    RetrievalResult(
+                        text=text,
+                        source=meta.get("source", docs[0]),
+                        page=meta.get("page", 1),
+                        chunk_number=meta.get("chunk", 0),
+                        score=1.0,
+                    )
+                    for text, meta in raw_chunks
+                ]
+            # Multiple documents indexed: which one "the document" refers
+            # to is ambiguous without conversation state. Falls back to a
+            # broad similarity search across all of them as a reasonable
+            # default, though this can still miss content in a specific
+            # long document -- a known limitation until per-document
+            # selection is added.
+            query_embedding = self.embedder.embed_query(question)
+            return self.retriever.retrieve(query_embedding, top_k=config.SUMMARY_TOP_K)
+
         query_embedding = self.embedder.embed_query(question)
-        top_k = config.SUMMARY_TOP_K if intent == "DOCUMENT" else config.TOP_K
-        return self.retriever.retrieve(query_embedding, top_k=top_k)
+        return self.retriever.retrieve(query_embedding, top_k=config.TOP_K)
 
     @staticmethod
     def _has_relevant_results(results) -> bool:
-        """Return whether retrieval found a plausible document match.
-
-        A vector store will always return the nearest chunks, even when every
-        chunk is unrelated to the question.  Treating those nearest chunks as
-        context is what caused general/web questions to be answered with a
-        refusal while still showing the uploaded paper as its source.
+        """
+        A vector store always returns the nearest chunks, even when every
+        chunk is unrelated to the question. This pre-check avoids wasting an
+        LLM call generating a document answer for a GENERAL question when
+        retrieval clearly found nothing relevant -- go straight to web
+        instead.
         """
         return bool(results) and max(c.score for c in results) >= config.RETRIEVAL_SCORE_THRESHOLD
 
@@ -64,17 +91,11 @@ class RAGEngine:
 
         results = self._retrieve_for_intent(question, intent)
 
-        # GENERAL questions are ambiguous: use the uploaded documents only
-        # when retrieval actually found a relevant match.  Otherwise go to
-        # Tavily directly so an unrelated paper is never presented as the
-        # answer's source.
         if intent == "GENERAL" and not self._has_relevant_results(results):
             web_results = self._web_fallback(question)
             if web_results:
                 return self.generator.generate_from_web(question, web_results)
-            # Do not expose unrelated paper chunks if Tavily is unavailable;
-            # generate an honest no-context response with no paper sources.
-            results = []
+            results = []  # don't cite an unrelated paper as this answer's source
 
         doc_answer = self.generator.generate(question, results)
 
@@ -82,6 +103,12 @@ class RAGEngine:
             web_results = self._web_fallback(question)
             if web_results:
                 return self.generator.generate_from_web(question, web_results)
+            # Web fallback also failed/unavailable. The answer is an honest
+            # "I don't know" -- it should NOT still cite the uploaded
+            # document as a source, since that document did not actually
+            # answer the question. Showing "I don't have this information"
+            # next to "Sources: research_paper.pdf" is misleading.
+            doc_answer["sources"] = []
 
         return doc_answer
 
@@ -107,7 +134,7 @@ class RAGEngine:
             web_results = self._web_fallback(question)
             if web_results:
                 return self._stream_web(question, web_results)
-            results = []
+            results = []  # don't cite an unrelated paper as this answer's source
 
         # Generate the full document answer first (not yet streamed to the
         # client) so we can check whether it's genuinely insufficient before
@@ -121,6 +148,9 @@ class RAGEngine:
             web_results = self._web_fallback(question)
             if web_results:
                 return self._stream_web(question, web_results)
+            # Web fallback also failed -- don't attach the uploaded document
+            # as a source for an "I don't know" answer.
+            doc_answer["sources"] = []
 
         sources = doc_answer["sources"]
         token_gen = self._replay_as_stream(doc_answer["answer"])
