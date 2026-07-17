@@ -28,6 +28,17 @@ class RAGEngine:
         top_k = config.SUMMARY_TOP_K if intent == "DOCUMENT" else config.TOP_K
         return self.retriever.retrieve(query_embedding, top_k=top_k)
 
+    @staticmethod
+    def _has_relevant_results(results) -> bool:
+        """Return whether retrieval found a plausible document match.
+
+        A vector store will always return the nearest chunks, even when every
+        chunk is unrelated to the question.  Treating those nearest chunks as
+        context is what caused general/web questions to be answered with a
+        refusal while still showing the uploaded paper as its source.
+        """
+        return bool(results) and max(c.score for c in results) >= config.RETRIEVAL_SCORE_THRESHOLD
+
     def _web_fallback(self, question):
         if not config.WEB_SEARCH_ENABLED:
             return None
@@ -52,6 +63,19 @@ class RAGEngine:
             # through to trying the documents rather than returning nothing.
 
         results = self._retrieve_for_intent(question, intent)
+
+        # GENERAL questions are ambiguous: use the uploaded documents only
+        # when retrieval actually found a relevant match.  Otherwise go to
+        # Tavily directly so an unrelated paper is never presented as the
+        # answer's source.
+        if intent == "GENERAL" and not self._has_relevant_results(results):
+            web_results = self._web_fallback(question)
+            if web_results:
+                return self.generator.generate_from_web(question, web_results)
+            # Do not expose unrelated paper chunks if Tavily is unavailable;
+            # generate an honest no-context response with no paper sources.
+            results = []
+
         doc_answer = self.generator.generate(question, results)
 
         if self.generator.answer_is_insufficient(doc_answer["answer"]):
@@ -78,6 +102,12 @@ class RAGEngine:
                 return self._stream_web(question, web_results)
 
         results = self._retrieve_for_intent(question, intent)
+
+        if intent == "GENERAL" and not self._has_relevant_results(results):
+            web_results = self._web_fallback(question)
+            if web_results:
+                return self._stream_web(question, web_results)
+            results = []
 
         # Generate the full document answer first (not yet streamed to the
         # client) so we can check whether it's genuinely insufficient before

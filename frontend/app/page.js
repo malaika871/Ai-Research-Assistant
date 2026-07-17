@@ -175,7 +175,7 @@ export default function Home() {
                 setMessages((prev) =>
                   prev.map((msg) =>
                     msg.id === botMsgId
-                      ? { ...msg, sources: data.sources }
+                      ? { ...msg, sources: data.sources, contextType: data.context_type || msg.contextType }
                       : msg
                   )
                 );
@@ -553,13 +553,31 @@ export default function Home() {
                                         key={idx}
                                         className="p-2.5 rounded-lg bg-white/2 border border-white/5 text-[11px] flex justify-between items-center"
                                       >
-                                        <div className="flex items-center gap-2 truncate">
-                                          <FileText size={12} className="text-slate-500 shrink-0" />
-                                          <span className="text-slate-300 truncate font-medium">{src.source}</span>
-                                        </div>
-                                        <span className="shrink-0 text-slate-500 px-2 py-0.5 rounded bg-white/5 border border-white/5 text-[10px] font-mono">
-                                          Page {src.page}
-                                        </span>
+                                        {src.url ? (
+                                          <a
+                                            href={src.url}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="flex items-center gap-2 truncate text-slate-300 hover:text-indigo-300 font-medium"
+                                          >
+                                            <Search size={12} className="text-indigo-400 shrink-0" />
+                                            <span className="truncate">{src.source}</span>
+                                          </a>
+                                        ) : (
+                                          <div className="flex items-center gap-2 truncate">
+                                            <FileText size={12} className="text-slate-500 shrink-0" />
+                                            <span className="text-slate-300 truncate font-medium">{src.source}</span>
+                                          </div>
+                                        )}
+                                        {src.url ? (
+                                          <span className="shrink-0 text-indigo-300 px-2 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/20 text-[10px] font-mono">
+                                            Web
+                                          </span>
+                                        ) : src.page != null ? (
+                                          <span className="shrink-0 text-slate-500 px-2 py-0.5 rounded bg-white/5 border border-white/5 text-[10px] font-mono">
+                                            Page {src.page}
+                                          </span>
+                                        ) : null}
                                       </div>
                                     ))}
                                   </motion.div>

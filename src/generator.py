@@ -42,9 +42,10 @@ DOCUMENT: the question asks about, summarizes, explains, or analyzes an uploaded
 document (e.g. "summarize this", "what is the main contribution of this paper",
 "explain section 3", "what does the author conclude", "list the key findings").
 
-WEB: the question explicitly needs current, live, or time-sensitive external
-information (e.g. "latest news", "today's weather", "current bitcoin price",
-"who won today's match", "recent developments in X").
+WEB: the question explicitly asks for internet/web/external information, or
+needs current, live, or time-sensitive information (e.g. "search the web for
+X", "latest news", "today's weather", "current bitcoin price", "who won
+today's match", "recent developments in X").
 
 GENERAL: a standalone knowledge question that is neither clearly about an
 uploaded document nor explicitly time-sensitive (e.g. "what is machine learning").
@@ -77,11 +78,36 @@ Category:"""
 
     def answer_is_insufficient(self, answer: str) -> bool:
         """
-        Detects the document prompt's exact honesty response, so the router
-        can fall back to web search based on what the model actually said
-        rather than a proxy signal like embedding similarity.
+        Detects common variants of the document prompt's honesty response.
+        Models sometimes omit punctuation or shorten the requested sentence;
+        matching only one exact phrase would leave the document sources on a
+        web-eligible question and prevent Tavily fallback.
         """
-        return "don't have enough information in the uploaded documents" in answer.lower()
+        normalized = " ".join((answer or "").lower().split())
+        # Small instruction-tuned models frequently omit the apostrophe in
+        # contractions ("I dont have information"). Normalize that harmless
+        # variation before checking the refusal markers.
+        normalized = normalized.replace("dont ", "don't ").replace("doesnt ", "doesn't ")
+        if "uploaded documents" in normalized and (
+            "don't have" in normalized
+            or "do not have" in normalized
+            or "not enough information" in normalized
+            or "cannot answer" in normalized
+            or "can't answer" in normalized
+        ):
+            return True
+        # Also cover concise refusals such as "I don't have information in
+        # the document" or "the context does not contain enough information".
+        return (
+            ("document" in normalized or "context" in normalized)
+            and (
+                "not enough information" in normalized
+                or "don't have information" in normalized
+                or "do not have information" in normalized
+                or "doesn't contain enough information" in normalized
+                or "does not contain enough information" in normalized
+            )
+        )
 
     def _build_document_prompt(self, question, retrieved_chunks):
         context = "\n\n".join(c.text for c in retrieved_chunks)
