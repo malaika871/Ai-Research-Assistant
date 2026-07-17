@@ -1,37 +1,46 @@
 import logging
+import os
 
-try:
-    from duckduckgo_search import DDGS
-except ImportError:  # pragma: no cover - fallback for older environments
-    from ddgs import DDGS  # type: ignore
+from tavily import TavilyClient
 
 logger = logging.getLogger(__name__)
 
 
 class WebSearcher:
     """
-    Free, no-API-key web search via DuckDuckGo, used as a fallback when the
-    user hasn't uploaded documents, or the uploaded documents don't contain
-    anything relevant to the question.
+    Web search via Tavily -- an API built specifically for LLM/RAG use
+    cases, more reliable than scraping-based alternatives (which can get
+    served degraded/generic results from datacenter IPs like HF Spaces).
+
+    Requires TAVILY_API_KEY in the environment. Get a free-tier key at
+    https://tavily.com
     """
 
+    def __init__(self):
+        api_key = os.getenv("TAVILY_API_KEY")
+        self._client = TavilyClient(api_key=api_key) if api_key else None
+        if not api_key:
+            logger.warning("TAVILY_API_KEY not set -- web search will return no results.")
+
     def search(self, query: str, max_results: int = 4):
-        if DDGS is None:
-            logger.warning("DuckDuckGo search client is unavailable; web search disabled")
+        if not self._client:
+            logger.error("Web search called but TAVILY_API_KEY is not configured.")
             return []
 
         try:
-            results = DDGS().text(query, max_results=max_results)
+            response = self._client.search(query, max_results=max_results)
         except Exception:
-            logger.exception("Web search failed for query=%r", query)
+            logger.exception("Tavily web search failed for query=%r", query)
             return []
+
+        results = response.get("results", []) if isinstance(response, dict) else []
 
         return [
             {
                 "title": r.get("title", "Untitled"),
-                "snippet": r.get("body", ""),
-                "url": r.get("href", ""),
+                "snippet": r.get("content", ""),
+                "url": r.get("url", ""),
             }
             for r in results
-            if r.get("body")
+            if r.get("content")
         ]
