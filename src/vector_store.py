@@ -51,6 +51,27 @@ class VectorStore:
             metadatas=metadatas,
         )
 
+    def get_all_chunks(self, source_name):
+        """
+        Fetches every chunk belonging to a document directly (chromadb
+        .get(), not a similarity-ranked ANN .query()). Used for whole-
+        document requests like "summarize this" -- similarity search with
+        any top_k cap risks silently missing chunks in a long document,
+        which produces an incomplete summary. This guarantees completeness.
+        """
+        data = self.collection.get(
+            where={"source": source_name},
+            include=["documents", "metadatas"],
+        )
+        if not data or not data.get("documents"):
+            return []
+
+        chunks = list(zip(data["documents"], data["metadatas"]))
+        # Preserve original document order (by page, then chunk number)
+        # rather than whatever order chromadb happens to return.
+        chunks.sort(key=lambda c: (c[1].get("page", 0), c[1].get("chunk", 0)))
+        return chunks
+
     def search(
         self,
         query_embedding,
