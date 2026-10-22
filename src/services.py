@@ -1,6 +1,6 @@
 import os
 from huggingface_hub import InferenceClient
-from config import EMBEDDING_MODEL, LLM_MODEL, LLM_PROVIDER
+import config
 
 
 class ServiceHub:
@@ -15,20 +15,32 @@ class ServiceHub:
     """
 
     _client = None
+    _openai_client = None
 
     @classmethod
     def get_client(cls):
         if cls._client is None:
             print("Initializing Hugging Face Inference client...")
             kwargs = {"token": os.getenv("HF_TOKEN")}
-            if LLM_PROVIDER:
-                kwargs["provider"] = LLM_PROVIDER
+            if config.LLM_PROVIDER:
+                kwargs["provider"] = config.LLM_PROVIDER
             cls._client = InferenceClient(**kwargs)
         return cls._client
 
     # Kept for backward compatibility with existing call sites.
     @classmethod
     def get_llm_client(cls):
+        if config.LLM_BACKEND == "openai_compat":
+            if cls._openai_client is None:
+                from openai import OpenAI
+
+                cls._openai_client = OpenAI(
+                    base_url=config.LLM_BASE_URL or None,
+                    api_key=config.LLM_API_KEY,
+                )
+            return cls._openai_client
+        if config.LLM_BACKEND != "hf":
+            raise ValueError(f"Unsupported LLM_BACKEND: {config.LLM_BACKEND}")
         return cls.get_client()
 
     @classmethod

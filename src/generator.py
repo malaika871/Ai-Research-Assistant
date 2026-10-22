@@ -2,6 +2,7 @@ import logging
 
 from src.services import ServiceHub
 from config import LLM_MODEL, LLM_TEMPERATURE, LLM_MAX_TOKENS
+import config
 
 logger = logging.getLogger(__name__)
 
@@ -13,11 +14,30 @@ class Generator:
 
     def _format_generation_error(self, exc) -> str:
         message = str(exc).lower()
+        status_code = getattr(exc, "status_code", None)
+        if status_code is None:
+            status_code = getattr(getattr(exc, "response", None), "status_code", None)
+        if status_code == 429 or "429" in message or "rate limit" in message:
+            return f"Rate limit reached on the {config.LLM_BACKEND} backend; please try again shortly."
         if "api_key" in message or "token" in message or "401" in message or "403" in message:
-            return "The Hugging Face inference credentials are not configured correctly. Please check the server environment."
-        if "not supported" in message or ("model" in message and "supported" in message):
-            return f"The configured model ({LLM_MODEL}) is currently unavailable on the Hugging Face Inference API."
+            return f"The {config.LLM_BACKEND} backend credentials are not configured correctly. Please check the server environment."
+        model_unavailable = (
+            "not supported" in message
+            or ("model" in message and "supported" in message)
+            or ("model" in message and ("not found" in message or "unavailable" in message))
+        )
+        if model_unavailable:
+            return f"The configured model ({config.LLM_MODEL}) is unavailable on the {config.LLM_BACKEND} backend."
         return "The language model is currently unavailable. Please try again shortly."
+
+    def _format_stream_interruption(self, exc) -> str:
+        message = str(exc).lower()
+        status_code = getattr(exc, "status_code", None)
+        if status_code is None:
+            status_code = getattr(getattr(exc, "response", None), "status_code", None)
+        if status_code == 429 or "429" in message or "rate limit" in message:
+            return self._format_generation_error(exc)
+        return "[error] The response was interrupted. Please try again."
 
     # --- Intent classification (replaces keyword matching for routing) ---
 
@@ -169,9 +189,9 @@ Question:
                 content = chunk.choices[0].delta.content
                 if content:
                     yield content
-        except Exception:
+        except Exception as exc:
             logger.exception("LLM streaming interrupted for question=%r", question)
-            yield "[error] The response was interrupted. Please try again."
+            yield self._format_stream_interruption(exc)
 
     # --- Web-grounded generation (fallback path) ---
 
@@ -236,9 +256,9 @@ Question:
                 content = chunk.choices[0].delta.content
                 if content:
                     yield content
-        except Exception:
+        except Exception as exc:
             logger.exception("LLM streaming (web) interrupted for question=%r", question)
-            yield "[error] The response was interrupted. Please try again."
+            yield self._format_stream_interruption(exc)
 
     # --- Combined generation (document + web, used when document relevance is borderline) ---
 
@@ -310,6 +330,6 @@ Question:
                 content = chunk.choices[0].delta.content
                 if content:
                     yield content
-        except Exception:
+        except Exception as exc:
             logger.exception("LLM streaming (combined) interrupted for question=%r", question)
-            yield "[error] The response was interrupted. Please try again."
+            yield self._format_stream_interruption(exc)

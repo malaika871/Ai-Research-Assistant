@@ -5,6 +5,7 @@ python-dotenv
 numpy
 python-docx
 huggingface_hub
+openai
 gradio
 fastapi
 uvicorn[standard]
