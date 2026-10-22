@@ -1,8 +1,11 @@
 from transformers import AutoTokenizer
+import config
+
+
 class TokenChunker:
     def __init__(self, model_name='sentence-transformers/all-MiniLM-L6-V2',
-        chunk_size = 256,
-        overlap=50,        
+        chunk_size=config.CHUNK_SIZE,
+        overlap=config.CHUNK_OVERLAP,
     ):
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.chunk_size = chunk_size

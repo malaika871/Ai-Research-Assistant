@@ -8,6 +8,15 @@ class DocumentChunk:
     page: int
     chunk_number: int
     text: str
+    doc_id: str = ""
+    title: str = ""
+    version: str = ""
+    status: str = ""
+    doc_type: str = ""
+    effective_date: str = ""
+    source_url: str = ""
+    section: str = ""
+    page_end: int = 0
 
 
 @dataclass

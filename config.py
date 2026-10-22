@@ -32,11 +32,15 @@ LLM_MODEL = os.getenv("LLM_MODEL", "Qwen/Qwen2.5-7B-Instruct")
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "").strip() or None
 
 # --- Chunking ---
-CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "512"))
-CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "64"))
+CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "256"))
+CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "50  "))
+# --- Vector store ---
+CHROMA_PATH = os.getenv("CHROMA_PATH", "chroma_db")
+COLLECTION_NAME = os.getenv("COLLECTION_NAME", "research_documents_v2")
 
-# --- Retrieval ---
-TOP_K = int(os.getenv("TOP_K", "5"))
+
+CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "256"))
+CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "50"))
 # Used for whole-document requests (summaries, overviews) where narrow
 # top-K similarity search misses most of the document's content.
 SUMMARY_TOP_K = int(os.getenv("SUMMARY_TOP_K", "15"))

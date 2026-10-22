@@ -1,12 +1,13 @@
 import chromadb
+import config
 
 
 class VectorStore:
 
-    def __init__(self):
+    def __init__(self, collection_name=config.COLLECTION_NAME, persist_path=config.CHROMA_PATH):
 
         self.client = chromadb.PersistentClient(
-            path="./chroma_db"
+            path=persist_path
         )
 
         # Explicitly use cosine distance. Without this, Chroma defaults to
@@ -15,7 +16,7 @@ class VectorStore:
         # to decide between document vs. web-search fallback, causing even
         # highly relevant matches to score far below the threshold.
         self.collection = self.client.get_or_create_collection(
-            name="research_documents_v2",
+            name=collection_name,
             metadata={"hnsw:space": "cosine"},
         )
 
@@ -40,16 +41,28 @@ class VectorStore:
                 "source": chunk.source,
                 "page": chunk.page,
                 "chunk": chunk.chunk_number,
+                "doc_id": chunk.doc_id if chunk.doc_id is not None else "",
+                "title": chunk.title if chunk.title is not None else "",
+                "version": chunk.version if chunk.version is not None else "",
+                "status": chunk.status if chunk.status is not None else "",
+                "doc_type": chunk.doc_type if chunk.doc_type is not None else "",
+                "effective_date": chunk.effective_date if chunk.effective_date is not None else "",
+                "source_url": chunk.source_url if chunk.source_url is not None else "",
+                "section": chunk.section if chunk.section is not None else "",
+                "page_end": chunk.page_end if chunk.page_end is not None else "",
             }
             for chunk in chunks
         ]
 
-        self.collection.add(
+        self.collection.upsert(
             ids=ids,
             documents=documents,
             embeddings=embeddings.tolist(),
             metadatas=metadatas,
         )
+
+    def delete_by_doc_id(self, doc_id):
+        self.collection.delete(where={"doc_id": doc_id})
 
     def get_all_chunks(self, source_name):
         """

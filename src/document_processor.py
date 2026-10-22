@@ -6,19 +6,23 @@ from src.chunker import TokenChunker
 from src.embedder import Embedder
 from src.vector_store import VectorStore
 from src.models import DocumentChunk
+import config
 
 
 class DocumentProcessor:
 
     def __init__(self):
 
-        self.chunker = TokenChunker()
+        self.chunker = TokenChunker(
+            chunk_size=config.CHUNK_SIZE,
+            overlap=config.CHUNK_OVERLAP,
+        )
 
         self.embedder = Embedder()
 
         self.vector_store = VectorStore()
 
-    def index(self, files, display_names=None):
+    def index(self, files, display_names=None, metadata=None):
         """
         display_names: optional dict {file_path: original_filename}. Needed
         because uploaded files are saved to disk with a UUID-prefixed name
@@ -26,6 +30,8 @@ class DocumentProcessor:
         to delete documents by their original filename, not the on-disk one.
         """
         display_names = display_names or {}
+        stable_metadata = metadata is not None
+        metadata = metadata or {}
 
         indexed_files = 0
         total_chunks = 0
@@ -38,6 +44,7 @@ class DocumentProcessor:
 
             document_chunks = []
             source_name = display_names.get(file_path, Path(file_path).name)
+            doc_id = metadata.get("doc_id") or source_name
 
             for page in pages:
 
@@ -51,11 +58,31 @@ class DocumentProcessor:
 
                         DocumentChunk(
 
-                            id=str(uuid.uuid4()),
+                            id=(
+                                f"{doc_id}::p{page['page']}::c{chunk_number}"
+                                if stable_metadata
+                                else str(uuid.uuid4())
+                            ),
 
                             source=source_name,
 
                             page=page["page"],
+
+                            doc_id=doc_id,
+
+                            title=metadata.get("title") or "",
+
+                            version=metadata.get("version") or "",
+
+                            status=metadata.get("status") or "",
+
+                            doc_type=metadata.get("doc_type") or "",
+
+                            effective_date=metadata.get("effective_date") or "",
+
+                            source_url=metadata.get("source_url") or "",
+
+                            page_end=page["page"],
 
                             chunk_number=chunk_number,
 
