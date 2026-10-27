@@ -6,17 +6,30 @@ from src.vector_store import VectorStore
 from src.web_search import WebSearcher
 from src.models import RetrievalResult
 import config
+import logging
+
+logger = logging.getLogger(__name__)
+import re
 
 
 class RAGEngine:
 
-    def __init__(self):
-        self.processor = DocumentProcessor()
+    def __init__(self, create_if_missing=None):
+        if create_if_missing is None:
+            create_if_missing = config.INTENT_MODE != "document"
+        self.vector_store = VectorStore(create_if_missing=create_if_missing)
+        self.processor = DocumentProcessor(vector_store=self.vector_store)
         self.embedder = Embedder()
-        self.retriever = Retriever()
+        self.retriever = Retriever(vector_store=self.vector_store)
         self.generator = Generator()
-        self.vector_store = VectorStore()
         self.web_searcher = WebSearcher()
+        if config.INTENT_MODE == "document" and self.vector_store.count_chunks() == 0:
+            logger.warning(
+                "Document intent mode is enabled, but Chroma collection '%s' at '%s' "
+                "is missing or empty; document retrieval will have no indexed chunks.",
+                self.vector_store.collection_name,
+                self.vector_store.persist_path,
+            )
 
     def index_documents(self, files, display_names=None):
         return self.processor.index(files, display_names=display_names)
@@ -25,35 +38,60 @@ class RAGEngine:
         return bool(self.vector_store.list_documents())
 
     def _retrieve_for_intent(self, question, intent):
-        if intent == "DOCUMENT":
-            docs = self.vector_store.list_documents()
-            if len(docs) == 1:
-                # Unambiguous: "the uploaded document" can only mean this
-                # one. Fetch every chunk directly instead of a similarity-
-                # ranked top-k, so a long document can't get silently
-                # truncated into an incomplete summary.
-                raw_chunks = self.vector_store.get_all_chunks(docs[0])
-                return [
-                    RetrievalResult(
-                        text=text,
-                        source=meta.get("source", docs[0]),
-                        page=meta.get("page", 1),
-                        chunk_number=meta.get("chunk", 0),
-                        score=1.0,
-                    )
-                    for text, meta in raw_chunks
-                ]
-            # Multiple documents indexed: which one "the document" refers
-            # to is ambiguous without conversation state. Falls back to a
-            # broad similarity search across all of them as a reasonable
-            # default, though this can still miss content in a specific
-            # long document -- a known limitation until per-document
-            # selection is added.
-            query_embedding = self.embedder.embed_query(question)
-            return self.retriever.retrieve(query_embedding, top_k=config.SUMMARY_TOP_K)
-
+        summary_request = bool(
+            re.search(
+                r"\b(summarize|summary|overview)\b|\bwhat\s+is\s+this\s+document\s+about\b",
+                question,
+                flags=re.IGNORECASE,
+            )
+        )
+        docs = self.vector_store.list_documents()
+        named_document = self._find_named_document(question, docs)
+        top_k = (
+            config.SUMMARY_TOP_K
+            if summary_request and named_document is not None
+            else config.TOP_K
+        )
         query_embedding = self.embedder.embed_query(question)
-        return self.retriever.retrieve(query_embedding, top_k=config.TOP_K)
+        results = self.retriever.retrieve(
+            query_embedding,
+            top_k=top_k,
+            document_filter=named_document,
+        )
+        return self._limit_context(results)
+
+    @staticmethod
+    def _find_named_document(question, documents):
+        normalized_question = question.casefold()
+        matches = [
+            document
+            for document in documents
+            if document and document.casefold() in normalized_question
+        ]
+        return matches[0] if len(matches) == 1 else None
+
+    @staticmethod
+    def _limit_context(results):
+        if not results:
+            return []
+        top_score = max(result.score for result in results)
+        score_floor = top_score - config.RETRIEVAL_SCORE_MARGIN
+        filtered = [result for result in results if result.score >= score_floor]
+        filtered.sort(key=lambda result: result.score, reverse=True)
+        return filtered[: config.CONTEXT_MAX_CHUNKS]
+
+    @staticmethod
+    def _document_sources(results):
+        best_by_document_page = {}
+        for result in results:
+            key = (result.doc_id or result.source, result.page)
+            previous = best_by_document_page.get(key)
+            if previous is None or result.score > previous.score:
+                best_by_document_page[key] = result
+        return [
+            {"source": result.source, "page": result.page, "url": None}
+            for result in best_by_document_page.values()
+        ]
 
     @staticmethod
     def _has_relevant_results(results) -> bool:
@@ -67,9 +105,14 @@ class RAGEngine:
         return bool(results) and max(c.score for c in results) >= config.RETRIEVAL_SCORE_THRESHOLD
 
     def _web_fallback(self, question):
-        if not config.WEB_SEARCH_ENABLED:
+        if not config.USE_FALLBACK or not config.WEB_SEARCH_ENABLED:
             return None
         return self.web_searcher.search(question, max_results=config.WEB_SEARCH_MAX_RESULTS) or None
+
+    def _classify_intent(self, question):
+        if config.INTENT_MODE == "document":
+            return "DOCUMENT"
+        return self.generator.classify_intent(question)
 
     def ask(self, question):
         has_docs = self._has_documents()
@@ -80,7 +123,7 @@ class RAGEngine:
                 return self.generator.generate_from_web(question, web_results)
             return self.generator.generate(question, [])  # honest "no info" response
 
-        intent = self.generator.classify_intent(question)
+        intent = self._classify_intent(question)
 
         if intent == "WEB":
             web_results = self._web_fallback(question)
@@ -98,6 +141,7 @@ class RAGEngine:
             results = []  # don't cite an unrelated paper as this answer's source
 
         doc_answer = self.generator.generate(question, results)
+        doc_answer["sources"] = self._document_sources(results)
 
         if self.generator.answer_is_insufficient(doc_answer["answer"]):
             web_results = self._web_fallback(question)
@@ -121,7 +165,7 @@ class RAGEngine:
                 return self._stream_web(question, web_results)
             return self._stream_document(question, [])
 
-        intent = self.generator.classify_intent(question)
+        intent = self._classify_intent(question)
 
         if intent == "WEB":
             web_results = self._web_fallback(question)
@@ -143,6 +187,7 @@ class RAGEngine:
         # regenerating it, so this costs one extra LLM call only on the
         # (less common) insufficient-info path, not on every request.
         doc_answer = self.generator.generate(question, results)
+        doc_answer["sources"] = self._document_sources(results)
 
         if self.generator.answer_is_insufficient(doc_answer["answer"]):
             web_results = self._web_fallback(question)
@@ -165,10 +210,7 @@ class RAGEngine:
         return token_gen, sources, "web"
 
     def _stream_document(self, question, results):
-        sources = [
-            {"source": r.source, "page": r.page, "url": None}
-            for r in results
-        ]
+        sources = self._document_sources(results)
         token_gen = self.generator.generate_stream(question, results)
         return token_gen, sources, "document"
 

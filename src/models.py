@@ -26,3 +26,4 @@ class RetrievalResult:
     page: int
     chunk_number: int
     score: float
+    doc_id: str = ""

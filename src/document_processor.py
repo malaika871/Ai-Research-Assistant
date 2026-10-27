@@ -11,7 +11,7 @@ import config
 
 class DocumentProcessor:
 
-    def __init__(self):
+    def __init__(self, vector_store=None):
 
         self.chunker = TokenChunker(
             chunk_size=config.CHUNK_SIZE,
@@ -20,7 +20,7 @@ class DocumentProcessor:
 
         self.embedder = Embedder()
 
-        self.vector_store = VectorStore()
+        self.vector_store = vector_store if vector_store is not None else VectorStore()
 
     def index(self, files, display_names=None, metadata=None):
         """
@@ -35,12 +35,14 @@ class DocumentProcessor:
 
         indexed_files = 0
         total_chunks = 0
+        total_pages = 0
 
         for file_path in files:
 
             loader = LoaderFactory.get_loader(file_path)
 
             pages = loader.extract_pages()
+            total_pages += len(pages)
 
             document_chunks = []
             source_name = display_names.get(file_path, Path(file_path).name)
@@ -82,6 +84,8 @@ class DocumentProcessor:
 
                             source_url=metadata.get("source_url") or "",
 
+                            section=metadata.get("section") or "",
+
                             page_end=page["page"],
 
                             chunk_number=chunk_number,
@@ -92,19 +96,11 @@ class DocumentProcessor:
 
                     )
 
-            embeddings = self.embedder.embed_documents(
-
-                [c.text for c in document_chunks]
-
-            )
-
-            self.vector_store.add_documents(
-
-                document_chunks,
-
-                embeddings
-
-            )
+            if document_chunks:
+                embeddings = self.embedder.embed_documents(
+                    [c.text for c in document_chunks]
+                )
+                self.vector_store.add_documents(document_chunks, embeddings)
 
             indexed_files += 1
 
@@ -114,6 +110,8 @@ class DocumentProcessor:
 
             "indexed_files": indexed_files,
 
-            "total_chunks": total_chunks
+            "total_chunks": total_chunks,
+
+            "total_pages": total_pages
 
         }

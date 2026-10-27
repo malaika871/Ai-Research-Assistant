@@ -1,5 +1,7 @@
 src/.env
 chroma_db/
+chroma_hec/
+index_manifest.json
 uploads/*
 !uploads/.gitkeep
 __pycache__/

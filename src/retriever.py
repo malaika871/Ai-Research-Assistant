@@ -4,9 +4,9 @@ from src.models import RetrievalResult
 
 class Retriever:
 
-    def __init__(self):
+    def __init__(self, vector_store=None):
 
-        self.vector_store = VectorStore()
+        self.vector_store = vector_store if vector_store is not None else VectorStore()
 
     def retrieve(
         self,
@@ -48,7 +48,8 @@ class Retriever:
                     source=metadata["source"],
                     page=metadata["page"],
                     chunk_number=metadata["chunk"],
-                    score=1 - distance
+                    score=1 - distance,
+                    doc_id=metadata.get("doc_id", ""),
                 )
 
             )

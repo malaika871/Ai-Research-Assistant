@@ -92,10 +92,6 @@ Category:"""
 
     # --- Document-grounded generation ---
 
-    INSUFFICIENT_INFO_MARKER = (
-        "I don't have enough information in the uploaded documents to answer this question."
-    )
-
     def answer_is_insufficient(self, answer: str) -> bool:
         """
         Detects common variants of the document prompt's honesty response.
@@ -136,7 +132,7 @@ outside knowledge, and do not guess or make up information, facts, or
 citations that are not present in the context.
 
 If the context does not contain enough information to answer the question,
-respond exactly with: "{self.INSUFFICIENT_INFO_MARKER}"
+respond exactly with: "{config.REFUSAL_TEXT}"
 
 Context:
 {context}

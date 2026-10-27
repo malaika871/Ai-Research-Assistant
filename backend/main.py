@@ -102,8 +102,20 @@ def home():
 @app.get("/health")
 def health():
     """Basic liveness/readiness probe for load balancers/orchestrators."""
+    if engine is None:
+        return {
+            "status": "starting",
+            "collection_name": config.COLLECTION_NAME,
+            "chunk_count": 0,
+            "document_count": 0,
+        }
+
+    vector_store = engine.vector_store
     return {
-        "status": "ok" if engine is not None else "starting",
+        "status": "ok",
+        "collection_name": vector_store.collection_name,
+        "chunk_count": vector_store.count_chunks(),
+        "document_count": vector_store.count_documents(),
     }
 
 
