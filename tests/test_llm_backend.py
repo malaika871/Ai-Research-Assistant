@@ -104,6 +104,34 @@ class LLMBackendTest(unittest.TestCase):
 
         self.assertEqual(generator.classify_intent("question"), "GENERAL")
 
+    def test_document_prompt_labels_each_chunk_with_source_and_page(self):
+        generator = generator_module.Generator.__new__(generator_module.Generator)
+        chunk = SimpleNamespace(
+            text="Refunds are handled under section 4.",
+            source="refund.pdf",
+            title="National Fee Refund Policy",
+            doc_id="refund-2024",
+            page=4,
+        )
+
+        prompt = generator._build_document_prompt("How are refunds handled?", [chunk])
+
+        self.assertIn("Document: National Fee Refund Policy", prompt)
+        self.assertIn("Source: refund.pdf", prompt)
+        self.assertIn("Document ID: refund-2024", prompt)
+        self.assertIn("Page: 4", prompt)
+        self.assertIn("Refunds are handled under section 4.", prompt)
+
+    def test_empty_model_answer_raises_clear_error(self):
+        generator = generator_module.Generator.__new__(generator_module.Generator)
+        generator.client = MagicMock()
+        generator.client.chat.completions.create.return_value = SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content="  "))]
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "empty answer"):
+            generator.generate("question", [])
+
     def test_error_messages_include_backend_and_handle_rate_limits(self):
         generator = generator_module.Generator.__new__(generator_module.Generator)
 

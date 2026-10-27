@@ -189,24 +189,49 @@ class VectorStore:
         )
 
     def list_documents(self):
+        records = self.list_document_records()
+        by_source = {}
+        for record in records:
+            by_source.setdefault(record["source"], []).append(record)
+
+        documents = []
+        for source, source_records in by_source.items():
+            if len(source_records) == 1:
+                documents.append(source)
+            else:
+                documents.extend(
+                    f"{source} [doc_id={record['doc_id']}]"
+                    for record in source_records
+                )
+        return sorted(documents)
+
+    def list_document_records(self):
         if self.collection is None:
             return []
 
         data = self.collection.get(include=["metadatas"])
-        if not data or not data.get("metadatas"):
-            return []
-
-        documents = sorted(
-            {
-                metadata["source"]
-                for metadata in data["metadatas"]
-                if metadata and "source" in metadata
-            }
-        )
-        return documents
+        records_by_id = {}
+        for metadata in data.get("metadatas") or []:
+            if not metadata:
+                continue
+            source = metadata.get("source", "")
+            doc_id = metadata.get("doc_id") or source
+            if not source or not doc_id:
+                continue
+            record = records_by_id.setdefault(
+                doc_id,
+                {"doc_id": doc_id, "source": source, "title": metadata.get("title") or source},
+            )
+            if not record["title"] and metadata.get("title"):
+                record["title"] = metadata["title"]
+        return list(records_by_id.values())
 
     def delete_document(self, document_name):
         if self.collection is None:
+            return
+        if " [doc_id=" in document_name and document_name.endswith("]"):
+            doc_id = document_name.rsplit(" [doc_id=", 1)[1][:-1]
+            self.delete_by_doc_id(doc_id)
             return
         self.collection.delete(
             where={

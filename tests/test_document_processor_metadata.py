@@ -70,6 +70,39 @@ class DocumentProcessorMetadataTest(unittest.TestCase):
                 all(item["doc_id"] == "test-doc-001" for item in stored["metadatas"])
             )
 
+    def test_same_named_uploads_receive_distinct_document_ids(self):
+        with TemporaryDirectory() as temp_dir:
+            tmp_path = Path(temp_dir)
+            paths = [tmp_path / "first.pdf", tmp_path / "second.pdf"]
+            for path in paths:
+                pdf = fitz.open()
+                pdf.new_page().insert_text((72, 72), "Unique upload identity test")
+                pdf.save(path)
+                pdf.close()
+
+            store = VectorStore(
+                collection_name="temporary_duplicate_names",
+                persist_path=str(tmp_path / "chroma"),
+            )
+            with (
+                patch.object(processor_module, "TokenChunker", return_value=FixedChunker()),
+                patch.object(processor_module, "Embedder", return_value=FixedEmbedder()),
+            ):
+                processor = processor_module.DocumentProcessor(vector_store=store)
+                processor.index(
+                    [str(path) for path in paths],
+                    display_names={str(path): "same.pdf" for path in paths},
+                )
+
+            stored = store.collection.get(include=["metadatas"])
+            doc_ids = {metadata["doc_id"] for metadata in stored["metadatas"]}
+            self.assertEqual(len(doc_ids), 2)
+            self.assertEqual(len(store.list_documents()), 2)
+
+            for doc_id in doc_ids:
+                store.delete_by_doc_id(doc_id)
+            self.assertEqual(store.collection.count(), 0)
+
 
 if __name__ == "__main__":
     unittest.main()

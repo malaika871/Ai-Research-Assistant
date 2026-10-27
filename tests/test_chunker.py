@@ -8,7 +8,12 @@ from src import chunker as chunker_module
 class FakeFastTokenizer:
     is_fast = True
 
-    def __call__(self, text, add_special_tokens, return_offsets_mapping):
+    def __call__(
+        self,
+        text,
+        add_special_tokens=False,
+        return_offsets_mapping=False,
+    ):
         matches = list(re.finditer(r"\S+", text))
         return {
             "input_ids": list(range(len(matches))),
@@ -19,6 +24,9 @@ class FakeFastTokenizer:
         token_count = len(re.findall(r"\S+", text))
         return token_count + (2 if add_special_tokens else 0)
 
+    def num_special_tokens_to_add(self, pair=False):
+        return 2
+
 
 class FakeEmbedder:
     def get_tokenizer_name(self, model_name=None):
@@ -26,6 +34,9 @@ class FakeEmbedder:
 
     def get_max_seq_tokens(self, model_name=None):
         return 12
+
+    def get_document_prefix(self, model_name=None):
+        return ""
 
 
 @pytest.fixture
@@ -86,3 +97,12 @@ def test_non_fast_tokenizer_raises_clear_error(monkeypatch):
 
     with pytest.raises(ValueError, match="is not fast"):
         chunker_module.TokenChunker(chunk_size=4, overlap=1)
+
+
+@pytest.mark.parametrize(
+    ("chunk_size", "overlap"),
+    [(0, 0), (4, -1), (4, 4)],
+)
+def test_invalid_chunk_window_settings_raise(chunk_size, overlap, make_chunker):
+    with pytest.raises(ValueError):
+        make_chunker(chunk_size=chunk_size, overlap=overlap)

@@ -20,7 +20,33 @@ class TokenChunker:
             raise ValueError(
                 f"Tokenizer for model '{model_name}' is not fast; offset mappings are required."
             )
-        self.chunk_size = min(chunk_size, self.embedder.get_max_seq_tokens(model_name))
+        if chunk_size <= 0:
+            raise ValueError("chunk_size must be greater than zero")
+        if overlap < 0 or overlap >= chunk_size:
+            raise ValueError("overlap must be non-negative and smaller than chunk_size")
+
+        max_seq_tokens = self.embedder.get_max_seq_tokens(model_name)
+        document_prefix = self.embedder.get_document_prefix(model_name)
+        prefix_tokens = len(
+            self.tokenizer(
+                document_prefix,
+                add_special_tokens=False,
+            )["input_ids"]
+        )
+        special_tokens = self.tokenizer.num_special_tokens_to_add(pair=False)
+        content_limit = max_seq_tokens - prefix_tokens - special_tokens
+        if content_limit <= 0:
+            raise ValueError(
+                f"Model '{model_name}' leaves no token capacity for document text "
+                "after its prefix and special tokens."
+            )
+
+        self.chunk_size = min(chunk_size, content_limit)
+        if overlap >= self.chunk_size:
+            raise ValueError(
+                "overlap must be smaller than the effective chunk size after "
+                "applying the embedding model token limit"
+            )
         self.overlap = overlap
 
     def chunk_text(self, text):

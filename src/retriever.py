@@ -12,12 +12,15 @@ class Retriever:
         self,
         query_embedding,
         top_k=5,
-        document_filter=None
+        document_filter=None,
+        metadata_filter=None,
     ):
 
         where = None
 
-        if document_filter:
+        if metadata_filter is not None:
+            where = metadata_filter
+        elif document_filter:
 
             where = {
                 "source": document_filter
@@ -50,6 +53,7 @@ class Retriever:
                     chunk_number=metadata["chunk"],
                     score=1 - distance,
                     doc_id=metadata.get("doc_id", ""),
+                    title=metadata.get("title", ""),
                 )
 
             )

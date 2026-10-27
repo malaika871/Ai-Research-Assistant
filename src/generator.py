@@ -126,7 +126,11 @@ Category:"""
         )
 
     def _build_document_prompt(self, question, retrieved_chunks):
-        context = "\n\n".join(c.text for c in retrieved_chunks)
+        context = "\n\n".join(
+            f"[Document: {c.title or c.source}; Source: {c.source}; "
+            f"Document ID: {c.doc_id or c.source}; Page: {c.page}]\n{c.text}"
+            for c in retrieved_chunks
+        )
         return f"""Answer the question using ONLY the context below. Do not use any
 outside knowledge, and do not guess or make up information, facts, or
 citations that are not present in the context.
@@ -155,8 +159,12 @@ Question:
             logger.exception("LLM generation failed for question=%r", question)
             raise RuntimeError(self._format_generation_error(exc)) from exc
 
+        answer = response.choices[0].message.content
+        if not isinstance(answer, str) or not answer.strip():
+            raise RuntimeError("The language model returned an empty answer.")
+
         return {
-            "answer": response.choices[0].message.content,
+            "answer": answer,
             "sources": [
                 {"source": c.source, "page": c.page, "url": None}
                 for c in retrieved_chunks

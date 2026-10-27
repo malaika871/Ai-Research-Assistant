@@ -46,7 +46,7 @@ class DocumentProcessor:
 
             document_chunks = []
             source_name = display_names.get(file_path, Path(file_path).name)
-            doc_id = metadata.get("doc_id") or source_name
+            doc_id = metadata.get("doc_id") or f"upload-{uuid.uuid4().hex}"
 
             for page in pages:
 
@@ -72,7 +72,7 @@ class DocumentProcessor:
 
                             doc_id=doc_id,
 
-                            title=metadata.get("title") or "",
+                            title=metadata.get("title") or source_name,
 
                             version=metadata.get("version") or "",
 

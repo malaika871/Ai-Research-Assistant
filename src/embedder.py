@@ -78,6 +78,9 @@ class Embedder:
     def get_tokenizer_name(self, model_name=None):
         return model_name or config.EMBEDDING_MODEL
 
+    def get_document_prefix(self, model_name=None):
+        return _model_metadata(model_name or config.EMBEDDING_MODEL)["document_prefix"]
+
     def embed_documents(self, texts):
         texts = list(texts)
         if not texts:

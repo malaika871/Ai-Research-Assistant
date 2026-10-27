@@ -1,3 +1,6 @@
+import logging
+import re
+
 from src.document_processor import DocumentProcessor
 from src.embedder import Embedder
 from src.retriever import Retriever
@@ -6,10 +9,8 @@ from src.vector_store import VectorStore
 from src.web_search import WebSearcher
 from src.models import RetrievalResult
 import config
-import logging
 
 logger = logging.getLogger(__name__)
-import re
 
 
 class RAGEngine:
@@ -45,30 +46,82 @@ class RAGEngine:
                 flags=re.IGNORECASE,
             )
         )
-        docs = self.vector_store.list_documents()
-        named_document = self._find_named_document(question, docs)
+        documents = self._document_records()
+        named_documents = self._find_named_documents(question, documents)
         top_k = (
             config.SUMMARY_TOP_K
-            if summary_request and named_document is not None
+            if summary_request and len(named_documents) == 1
             else config.TOP_K
         )
         query_embedding = self.embedder.embed_query(question)
+        cross_document = len(named_documents) > 1 or self._is_cross_document_question(question)
+        if len(named_documents) > 1:
+            per_document_results = []
+            for record in named_documents:
+                per_document_results.extend(
+                    self.retriever.retrieve(
+                        query_embedding,
+                        top_k=config.TOP_K,
+                        metadata_filter=self._document_filter(record),
+                    )
+                )
+            return self._limit_context_across_documents(per_document_results)
+
+        if cross_document:
+            candidate_count = max(config.TOP_K, config.CONTEXT_MAX_CHUNKS * 3)
+            results = self.retriever.retrieve(query_embedding, top_k=candidate_count)
+            return self._limit_context_across_documents(results)
+
+        metadata_filter = self._document_filter(named_documents[0]) if named_documents else None
         results = self.retriever.retrieve(
             query_embedding,
             top_k=top_k,
-            document_filter=named_document,
+            metadata_filter=metadata_filter,
         )
         return self._limit_context(results)
 
-    @staticmethod
-    def _find_named_document(question, documents):
-        normalized_question = question.casefold()
-        matches = [
-            document
-            for document in documents
-            if document and document.casefold() in normalized_question
+    def _document_records(self):
+        if hasattr(self.vector_store, "list_document_records"):
+            return self.vector_store.list_document_records()
+        return [
+            {"source": source, "title": source, "doc_id": source}
+            for source in self.vector_store.list_documents()
         ]
-        return matches[0] if len(matches) == 1 else None
+
+    @staticmethod
+    def _normalize_document_label(value):
+        return " ".join(re.sub(r"[^\w]+", " ", value.casefold()).split())
+
+    @classmethod
+    def _find_named_documents(cls, question, documents):
+        normalized_question = f" {cls._normalize_document_label(question)} "
+        matches = []
+        for document in documents:
+            aliases = (document.get("source"), document.get("title"), document.get("doc_id"))
+            if any(
+                alias
+                and f" {cls._normalize_document_label(alias)} " in normalized_question
+                for alias in aliases
+            ):
+                matches.append(document)
+        return matches
+
+    @staticmethod
+    def _document_filter(document):
+        doc_id = document.get("doc_id")
+        if doc_id:
+            return {"doc_id": doc_id}
+        return {"source": document["source"]}
+
+    @classmethod
+    def _is_cross_document_question(cls, question):
+        return bool(
+            re.search(
+                r"\b(compare|comparison|contrast|across|between|among|each|both|all)\b",
+                question,
+                flags=re.IGNORECASE,
+            )
+        )
 
     @staticmethod
     def _limit_context(results):
@@ -79,6 +132,35 @@ class RAGEngine:
         filtered = [result for result in results if result.score >= score_floor]
         filtered.sort(key=lambda result: result.score, reverse=True)
         return filtered[: config.CONTEXT_MAX_CHUNKS]
+
+    @staticmethod
+    def _limit_context_across_documents(results):
+        if not results:
+            return []
+
+        by_document = {}
+        for result in results:
+            key = result.doc_id or result.source
+            by_document.setdefault(key, []).append(result)
+
+        ranked_groups = []
+        for group in by_document.values():
+            top_score = max(result.score for result in group)
+            score_floor = top_score - config.RETRIEVAL_SCORE_MARGIN
+            ranked_groups.append(
+                sorted(
+                    (result for result in group if result.score >= score_floor),
+                    key=lambda result: result.score,
+                    reverse=True,
+                )
+            )
+
+        selected = []
+        while len(selected) < config.CONTEXT_MAX_CHUNKS and any(ranked_groups):
+            for group in ranked_groups:
+                if group and len(selected) < config.CONTEXT_MAX_CHUNKS:
+                    selected.append(group.pop(0))
+        return selected
 
     @staticmethod
     def _document_sources(results):
@@ -111,6 +193,13 @@ class RAGEngine:
 
     def _classify_intent(self, question):
         if config.INTENT_MODE == "document":
+            return "DOCUMENT"
+        records = self._document_records()
+        if self._find_named_documents(question, records):
+            return "DOCUMENT"
+        if len(records) > 1 and self._is_cross_document_question(question):
+            return "DOCUMENT"
+        if len(records) == 1 and re.search(r"\b(document|pdf|file|upload)\b", question, re.IGNORECASE):
             return "DOCUMENT"
         return self.generator.classify_intent(question)
 
